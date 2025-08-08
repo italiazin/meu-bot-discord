@@ -2,9 +2,6 @@ import discord
 import os
 import aiohttp
 import random
-from dotenv import load_dotenv
-
-load_dotenv()  # Carrega variáveis do arquivo .env
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -26,13 +23,16 @@ async def on_message(message):
     if message.author == client.user:
         return
 
+    # Só responde a menções diretas, ignorando replies
     if client.user in message.mentions and message.reference is None:
         attachments = message.attachments
 
         if attachments:
-            for attachment in attachments:
-                if attachment.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
-                    async with aiohttp.ClientSession() as session:
+            # Salvar todas as imagens anexadas
+            saved_any = False
+            async with aiohttp.ClientSession() as session:
+                for attachment in attachments:
+                    if attachment.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
                         async with session.get(attachment.url) as resp:
                             if resp.status == 200:
                                 data = await resp.read()
@@ -40,20 +40,28 @@ async def on_message(message):
                                 filepath = os.path.join(IMAGEM_DIR, filename)
                                 with open(filepath, 'wb') as f:
                                     f.write(data)
-                                await message.channel.send("Imagem salva com sucesso!")
-                                return
+                                saved_any = True
+            if saved_any:
+                await message.channel.send("Imagem(s) salva(s) com sucesso!")
+            else:
+                await message.channel.send("Nenhuma imagem válida para salvar.")
+            return
+
         else:
+            # Envia 1 imagem aleatória da pasta
             imagens_salvas = [
                 os.path.join(IMAGEM_DIR, f)
                 for f in os.listdir(IMAGEM_DIR)
                 if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
             ]
-
             if imagens_salvas:
                 imagem_aleatoria = random.choice(imagens_salvas)
                 await message.channel.send(file=discord.File(imagem_aleatoria))
             else:
                 await message.channel.send("Ainda não há imagens salvas.")
 
-# Executa o bot usando a variável de ambiente
+# Lembre-se de rodar o bot usando o token como variável de ambiente!
+import os
 client.run(os.getenv("DISCORD_TOKEN"))
+
+
